@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123c32">
+<title>Penagihan Karyawan | Toko Zizan</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+:root {
+  --primary: #123c32;
+  --secondary: #1b5947;
+  --accent: #d7f36b;
+  --bg: #f3f6f4;
+  --text: #192b25;
+  --muted: #738078;
+  --white: #fff;
+  --border: #e4eae6;
+  --danger: #c43d3d;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+button, input {
+  font: inherit;
+}
+button { cursor: pointer; }
+header {
+  background: var(--primary);
+  color: white;
+  padding: 22px 20px 34px;
+  border-radius: 0 0 26px 26px;
+}
+.header-inner, main {
+  max-width: 900px;
+  margin: auto;
+}
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.logo {
+  width: 46px;
+  height: 46px;
+  background: var(--accent);
+  color: var(--primary);
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 20px;
+}
+.brand h1 { font-size: 19px; margin: 0 0 5px; }
+.brand p { margin: 0; font-size: 12px; opacity: .8; }
+main { padding: 18px 15px 40px; }
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  padding: 19px;
+  margin-bottom: 15px;
+  box-shadow: 0 5px 20px #153c3210;
+}
+h2 { font-size: 18px; margin: 0 0 7px; }
+h3 { font-size: 15px; margin: 0 0 12px; }
+.muted { color: var(--muted); font-size: 13px; line-height: 1.6; }
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 15px 0 7px;
+}
+input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fbfcfb;
+  outline-color: var(--secondary);
+}
+.btn {
+  width: 100%;
+  padding: 13px 15px;
+  border: 0;
+  border-radius: 11px;
+  font-weight: 700;
+  margin-top: 12px;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-accent { background: var(--accent); color: var(--primary); }
+.btn-light { background: #eaf1ed; color: var(--primary); }
+.btn-danger { background: #fff0f0; color: var(--danger); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 11px;
+  margin-bottom: 15px;
+}
+.stat {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 15px;
+}
+.stat span { display: block; color: var(--muted); font-size: 11px; }
+.stat strong {
+  display: block;
+  font-size: 17px;
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.stat.highlight { background: var(--primary); color: white; }
+.stat.highlight span { color: #c6d9d0; }
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.row:last-child { border-bottom: 0; }
+.row span:first-child { color: var(--muted); }
+.row strong { text-align: right; overflow-wrap: anywhere; }
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #eaf7e8;
+  color: #286b38;
+  font-size: 11px;
+  font-weight: bold;
+}
+.hidden { display: none !important; }
+.notice {
+  border-radius: 10px;
+  background: #fff8df;
+  color: #72591c;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+#reader { width: 100%; margin-top: 14px; }
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.receipt {
+  border: 1px dashed #8c9a90;
+  border-radius: 12px;
+  padding: 18px;
+  background: white;
+}
+.receipt-title { text-align: center; margin-bottom: 18px; }
+.receipt-title h2 { font-size: 17px; }
+.receipt-title p { font-size: 12px; color: var(--muted); }
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 20px;
+}
+@media(min-width:650px) {
+  .grid { grid-template-columns: repeat(4, 1fr); }
+  main { padding-top: 25px; }
+}
+@media print {
+  body { background: white; }
+  body * { visibility: hidden; }
+  #receipt, #receipt * { visibility: visible; }
+  #receipt {
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    border: 0;
+  }
+  .no-print { display: none !important; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="logo">Z</div>
+      <div>
+        <h1>TOKO ZIZAN</h1>
+        <p>Aplikasi Penagihan Lapangan</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- LOGIN -->
+<section id="loginSection" class="card">
+  <h2>Selamat datang 👋</h2>
+  <p class="muted">Masuk menggunakan akun karyawan yang telah dibuat oleh admin.</p>
+
+  <form id="loginForm">
+    <label for="email">Email karyawan</label>
+    <input id="email" type="email" autocomplete="username"
+           placeholder="nama@tokozizan.com" required>
+
+    <label for="password">Kata sandi</label>
+    <input id="password" type="password"
+           autocomplete="current-password"
+           placeholder="Masukkan kata sandi" required>
+
+    <button class="btn btn-primary" type="submit">Masuk ke Aplikasi</button>
+  </form>
+
+  <p id="loginMessage" class="muted" role="status"></p>
+</section>
+
+<!-- DASHBOARD -->
+<section id="dashboard" class="hidden">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+      <div>
+        <span class="badge">● Area Petugas</span>
+        <h2 style="margin-top:12px">Dashboard Penagihan</h2>
+        <p class="muted">Catat pembayaran nasabah dengan teliti.</p>
+      </div>
+      <button id="logoutBtn" class="btn btn-light"
+              style="width:auto;margin:0">Keluar</button>
+    </div>
+    <p id="employeeEmail" class="muted"></p>
+  </div>
+
+  <div class="grid">
+    <div class="stat">
+      <span>Nasabah dipilih</span>
+      <strong id="customerCode">-</strong>
+    </div>
+    <div class="stat">
+      <span>Pinjaman aktif</span>
+      <strong id="loanCount">0</strong>
+    </div>
+    <div class="stat">
+      <span>Total dibayar</span>
+      <strong id="paidTotal">Rp 0</strong>
+    </div>
+    <div class="stat highlight">
+      <span>Sisa tagihan</span>
+      <strong id="remaining">Rp 0</strong>
+    </div>
+  </div>
+
+  <!-- SCAN -->
+  <div class="card">
+    <h2>📷 Scan QR Nasabah</h2>
+    <p class="muted">Arahkan kamera ke QR nasabah untuk mencari data pelanggan.</p>
+
+    <button id="startScan" type="button" class="btn btn-primary">Buka Kamera & Scan QR</button>
+    <button id="stopScan" type="button" class="btn btn-light hidden">Tutup Kamera</button>
+    <div id="reader"></div>
+
+    <label for="manualCode">Atau masukkan kode nasabah</label>
+    <div class="actions">
+      <input id="manualCode" placeholder="Contoh: NZ001">
+      <button id="searchCustomer" type="button" class="btn btn-primary" style="margin:0">
+        Cari
+      </button>
+    </div>
+    <p id="searchMessage" class="muted" role="status"></p>
+  </div>
+
+  <!-- CUSTOMER -->
+  <div id="customerSection" class="card hidden">
+    <h2>Informasi Nasabah</h2>
+    <div class="row"><span>Nama</span><strong id="customerName">-</strong></div>
+    <div class="row"><span>Kode nasabah</span><strong id="customerCodeInfo">-</strong></div>
+    <div class="row"><span>Telepon</span><strong id="customerPhone">-</strong></div>
+
+    <h3 style="margin-top:22px">Daftar Pinjaman</h3>
+    <div id="loanList" class="muted">Belum ada data pinjaman.</div>
+  </div>
+
+  <!-- PAYMENT -->
+  <div id="paymentSection" class="card hidden">
+    <h2>💵 Catat Pembayaran</h2>
+    <p class="muted">Pastikan uang sudah diterima sebelum menyimpan transaksi.</p>
+
+    <label for="loanSelect">Pilih pinjaman</label>
+    <select id="loanSelect" style="width:100%;padding:13px;border:1px solid #e4eae6;border-radius:11px">
+      <option value="">Pilih pinjaman</option>
+    </select>
+
+    <label for="paymentAmount">Nominal diterima (Rp)</label>
+    <input id="paymentAmount" type="number" min="1" step="1"
+           placeholder="Masukkan nominal pembayaran">
+
+    <label for="paymentNote">Keterangan (opsional)</label>
+    <input id="paymentNote" maxlength="200"
+           placeholder="Contoh: Setoran harian">
+
+    <div class="notice">
+      Periksa nama nasabah, kode pinjaman, dan jumlah uang sebelum konfirmasi.
+      Jangan simpan transaksi jika uang belum diterima.
+    </div>
+
+    <button id="savePayment" type="button" class="btn btn-primary">
+      Konfirmasi Pembayaran
+    </button>
+    <p id="paymentMessage" class="muted" role="status"></p>
+  </div>
+
+  <!-- RECEIPT -->
+  <div id="receiptSection" class="card hidden">
+    <div id="receipt" class="receipt">
+      <div class="receipt-title">
+        <h2>SIMPAN PINJAM TOKO ZIZAN</h2>
+        <p>BUKTI PEMBAYARAN</p>
+      </div>
+      <div class="row"><span>No. transaksi</span><strong id="rCode">-</strong></div>
+      <div class="row"><span>Tanggal</span><strong id="rDate">-</strong></div>
+      <div class="row"><span>Nasabah</span><strong id="rName">-</strong></div>
+      <div class="row"><span>Kode pinjaman</span><strong id="rLoan">-</strong></div>
+      <div class="row"><span>Jumlah diterima</span><strong id="rAmount">Rp 0</strong></div>
+      <div class="row"><span>Keterangan</span><strong id="rNote">-</strong></div>
+      <p class="muted" style="text-align:center;margin-top:20px">
+        Terima kasih. Simpan bukti pembayaran ini.
+      </p>
+    </div>
+    <button id="printReceipt" class="btn btn-primary no-print">Cetak / Simpan PDF</button>
+  </div>
+</section>
+
+<footer>
+  Toko Zizan · Aplikasi Penagihan Karyawan<br>
+  Gunakan data nasabah secara bertanggung jawab.
+</footer>
+</main>
+
+<script>
+/*
+ * KONFIGURASI SUPABASE
+ *
+ * Isi URL proyek dan anon/publishable key.
+ * JANGAN gunakan service_role key di HTML.
+ *
+ * Koneksi database dan penyimpanan pembayaran baru boleh diaktifkan
+ * setelah kolom tabel serta kebijakan RLS diperiksa.
+ */
+const SUPABASE_URL = "https://hhcrnxemyuwscyosurfp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoY3JueGVteXV3c2N5b3N1cmZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NTU2MTgsImV4cCI6MjEwNzUzMTYxOH0._mLbNCW05BV0eKxFUS_nLhh-uUAFGHDcPASVeHpFP4w";
+
+let db = null;
+let scanner = null;
+let currentCustomer = null;
+let currentLoans = [];
+let selectedLoan = null;
+
+const $ = id => document.getElementById(id);
+const rupiah = n => "Rp " + Number(n || 0).toLocaleString("id-ID");
+
+function message(id, text) {
+  $(id).textContent = text;
+}
+
+function show(id) {
+  $(id).classList.remove("hidden");
+}
+
+function hide(id) {
+  $(id).classList.add("hidden");
+}
+
+function initSupabase() {
+  if (!SUPABASE_ANON_KEY ||
+      SUPABASE_ANON_KEY === "ISI_DENGAN_ANON_KEY_SUPABASE") {
+    message("loginMessage",
+      "Konfigurasi belum lengkap. Isi anon/publishable key Supabase terlebih dahulu.");
+    return false;
+  }
+
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return true;
+}
+
+async function loadSession() {
+  if (!db) return;
+
+  const { data, error } = await db.auth.getSession();
+  if (error) {
+    message("loginMessage", error.message);
+    return;
+  }
+
+  if (data.session) {
+    await enterDashboard(data.session.user);
+  }
+}
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if (!db && !initSupabase()) return;
+
+  message("loginMessage", "Memeriksa akun...");
+  const { data, error } = await db.auth.signInWithPassword({
+    email: $("email").value.trim(),
+    password: $("password").value
+  });
+
+  if (error) {
+    message("loginMessage", "Login gagal: " + error.message);
+    return;
+  }
+
+  await enterDashboard(data.user);
+});
+
+async function enterDashboard(user) {
+  hide("loginSection");
+  show("dashboard");
+  $("employeeEmail").textContent = user.email || "Petugas";
+  message("searchMessage",
+    "Login berhasil. Cari nasabah menggunakan QR atau kode nasabah.");
+}
+
+$("logoutBtn").addEventListener("click", async () => {
+  if (db) await db.auth.signOut();
+  await stopScanner();
+  currentCustomer = null;
+  currentLoans = [];
+  selectedLoan = null;
+  hide("dashboard");
+  show("loginSection");
+});
+
+async function lookupCustomer(code) {
+  if (!db) return;
+
+  code = String(code || "").trim();
+  if (!code) {
+    message("searchMessage", "Masukkan kode nasabah.");
+    return;
+  }
+
+  message("searchMessage", "Mencari data nasabah...");
+
+  /*
+   * Query membaca tabel yang sudah digunakan aplikasi utama.
+   * Kebijakan RLS harus mengizinkan petugas terautentikasi
+   * membaca data yang diperlukan.
+   */
+  const { data: customer, error } = await db
+    .from("nasabah")
+    .select("id,kode,nama,tlp,alamat")
+    .eq("kode", code)
+    .maybeSingle();
+
+  if (error) {
+    message("searchMessage",
+      "Gagal membaca nasabah. Periksa izin RLS dan koneksi Supabase.");
+    console.error(error);
+    return;
+  }
+
+  if (!customer) {
+    message("searchMessage", "Nasabah tidak ditemukan.");
+    return;
+  }
+
+  currentCustomer = customer;
+
+  const { data: loans, error: loanError } = await db
+    .from("pinjaman")
+    .select("id,kode,nasabah_id,nasabah_kode,tgl,tenor,nominal,bunga,jenis_pinjaman,setoran_harian,status")
+    .eq("nasabah_kode", customer.kode);
+
+  if (loanError) {
+    message("searchMessage",
+      "Nasabah ditemukan, tetapi data pinjaman tidak dapat dibaca.");
+    console.error(loanError);
+    return;
+  }
+
+  currentLoans = loans || [];
+  renderCustomer();
+  message("searchMessage", "Data nasabah berhasil ditemukan.");
+}
+
+function renderCustomer() {
+  show("customerSection");
+  show("paymentSection");
+  hide("receiptSection");
+
+  $("customerName").textContent = currentCustomer.nama || "-";
+  $("customerCodeInfo").textContent = currentCustomer.kode || "-";
+  $("customerPhone").textContent = currentCustomer.tlp || "-";
+  $("customerCode").textContent = currentCustomer.kode || "-";
+  $("loanCount").textContent = currentLoans.length;
+
+  const select = $("loanSelect");
+  select.innerHTML = '<option value="">Pilih pinjaman</option>';
+
+  $("loanList").replaceChildren();
+
+  if (!currentLoans.length) {
+    $("loanList").textContent = "Nasabah belum memiliki data pinjaman.";
+  }
+
+  currentLoans.forEach(loan => {
+    const option = document.createElement("option");
+    option.value = loan.kode;
+    option.textContent =
+      loan.kode + " · " + rupiah(loan.nominal) + " · " + (loan.status || "Aktif");
+    select.appendChild(option);
+
+    const item = document.createElement("div");
+    item.className = "row";
+
+    const name = document.createElement("span");
+    name.textContent = loan.kode + " (" + (loan.status || "Status tidak tersedia") + ")";
+
+    const value = document.createElement("strong");
+    value.textContent = rupiah(loan.nominal);
+
+    item.append(name, value);
+    $("loanList").appendChild(item);
+  });
+
+  $("paidTotal").textContent = "Perlu verifikasi";
+  $("remaining").textContent = "Perlu verifikasi";
+  selectedLoan = null;
+}
+
+$("searchCustomer").addEventListener("click", async () => {
+  await lookupCustomer($("manualCode").value);
+});
+
+$("loanSelect").addEventListener("change", () => {
+  const code = $("loanSelect").value;
+  selectedLoan = currentLoans.find(x => x.kode === code) || null;
+});
+
+/* SCAN QR */
+$("startScan").addEventListener("click", async () => {
+  if (!db) {
+    message("searchMessage", "Koneksi Supabase belum siap. Muat ulang halaman dan login kembali.");
+    return;
+  }
+  if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    message("searchMessage", "Kamera browser hanya dapat digunakan melalui HTTPS. Buka aplikasi dari alamat HTTPS, atau masukkan kode nasabah secara manual.");
+    return;
+  }
+  if (!window.Html5Qrcode) {
+    message("searchMessage", "Modul pemindai QR gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.");
+    return;
+  }
+
+  try {
+    if (scanner) await stopScanner();
+    scanner = new Html5Qrcode("reader");
+    show("stopScan");
+
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 230, height: 230 } },
+      async decodedText => {
+        const code = extractCustomerCode(decodedText);
+        $("manualCode").value = code;
+        await stopScanner();
+        await lookupCustomer(code);
+      },
+      () => {}
+    );
+  } catch (error) {
+    message("searchMessage", "Kamera gagal dibuka: " + (error?.message || error) + ". Pastikan izin kamera diberikan dan halaman dibuka melalui HTTPS.");
+    console.error("QR scanner start error:", error);
+    await stopScanner();
+  }
+});
+
+function extractCustomerCode(raw) {
+  const value = String(raw || "").trim();
+  // Mendukung QR berisi kode langsung, URL dengan parameter kode, atau JSON sederhana.
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object") {
+      return String(parsed.kode || parsed.nasabah_kode || parsed.code || parsed.customerCode || value).trim();
+    }
+  } catch (_) {}
+  try {
+    const url = new URL(value);
+    const code = url.searchParams.get("kode") || url.searchParams.get("nasabah_kode") || url.searchParams.get("code");
+    if (code) return code.trim();
+  } catch (_) {}
+  return value;
+}
+
+async function stopScanner() {
+  if (!scanner) return;
+
+  try {
+    if (scanner.isScanning) await scanner.stop();
+    await scanner.clear();
+  } catch (error) {
+    console.warn(error);
+  }
+
+  scanner = null;
+  hide("stopScan");
+}
+
+$("stopScan").addEventListener("click", stopScanner);
+
+/* Simpan satu pembayaran baru ke tabel pembayaran.
+   Struktur kolom mengikuti aplikasi utama Toko Zizan:
+   kode, pinjaman_id, pinjaman_kode, nasabah_id, nasabah_kode, tgl, nominal, ket.
+   Tidak melakukan sinkronisasi/penghapusan massal tabel. */
+$("savePayment").addEventListener("click", async () => {
+  const button = $("savePayment");
+  if (!db) {
+    message("paymentMessage", "Koneksi Supabase belum siap. Muat ulang halaman.");
+    return;
+  }
+  if (!currentCustomer) {
+    message("paymentMessage", "Pilih nasabah terlebih dahulu.");
+    return;
+  }
+  if (!selectedLoan) {
+    message("paymentMessage", "Pilih pinjaman terlebih dahulu.");
+    return;
+  }
+  const amount = Number($("paymentAmount").value);
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    message("paymentMessage", "Masukkan nominal pembayaran dalam rupiah yang valid.");
+    return;
+  }
+  if (!selectedLoan.id || !currentCustomer.id || !selectedLoan.kode || !currentCustomer.kode) {
+    message("paymentMessage", "ID nasabah/pinjaman tidak lengkap dari database. Periksa kolom id dan kode.");
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Menyimpan...";
+  message("paymentMessage", "Menyimpan pembayaran ke Supabase...");
+  try {
+    const now = new Date();
+    const paymentCode = "BYR-" + now.getTime().toString() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+    const note = $("paymentNote").value.trim();
+    const row = {
+      kode: paymentCode,
+      pinjaman_id: selectedLoan.id,
+      pinjaman_kode: selectedLoan.kode,
+      nasabah_id: currentCustomer.id,
+      nasabah_kode: currentCustomer.kode,
+      tgl: now.toISOString(),
+      nominal: amount,
+      ket: note || null
+    };
+    const { error } = await db.from("pembayaran").insert(row);
+    if (error) throw error;
+
+    // INSERT dikonfirmasi oleh Supabase. Tidak meminta data balik agar tidak
+    // membutuhkan policy SELECT tambahan hanya untuk menampilkan struk.
+    $("rCode").textContent = row.kode;
+    $("rDate").textContent = now.toLocaleString("id-ID");
+    $("rName").textContent = currentCustomer.nama || "-";
+    $("rLoan").textContent = row.pinjaman_kode;
+    $("rAmount").textContent = rupiah(row.nominal);
+    $("rNote").textContent = row.ket || "-";
+    show("receiptSection");
+    message("paymentMessage", "Pembayaran berhasil disimpan ke Supabase. Nomor transaksi: " + row.kode);
+    $("paymentAmount").value = "";
+    $("paymentNote").value = "";
+
+    // Perbarui ringkasan total pembayaran bila izin SELECT tabel pembayaran tersedia.
+    const { data: payments, error: readError } = await db.from("pembayaran")
+      .select("nominal").eq("pinjaman_kode", selectedLoan.kode);
+    if (!readError && payments) {
+      const paid = payments.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+      $("paidTotal").textContent = rupiah(paid);
+    }
+  } catch (error) {
+    console.error("Gagal menyimpan pembayaran:", error);
+    let detail = error?.message || String(error);
+    if (error?.code === "42501" || /row-level security|permission denied/i.test(detail)) {
+      detail += " — periksa RLS/policy INSERT pada tabel public.pembayaran untuk pengguna karyawan yang login.";
+    } else if (/column .* does not exist|schema cache/i.test(detail)) {
+      detail += " — nama kolom tabel pembayaran berbeda dari skema aplikasi utama.";
+    }
+    message("paymentMessage", "Pembayaran BELUM tersimpan: " + detail);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Konfirmasi Pembayaran";
+  }
+});
+
+$("printReceipt").addEventListener("click", () => window.print());
+
+if (initSupabase()) {
+  loadSession();
+}
+</script>
+</body>
+</html>
