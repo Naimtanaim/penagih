@@ -301,7 +301,9 @@ footer {
 
     <label for="paymentAmount">Nominal diterima (Rp)</label>
     <input id="paymentAmount" type="number" min="1" step="1"
-           placeholder="Masukkan nominal pembayaran">
+           placeholder="Nominal otomatis sesuai tagihan" readonly
+           aria-describedby="paymentAmountHelp">
+    <p id="paymentAmountHelp" class="muted">Nominal terisi otomatis sesuai tagihan pinjaman dan tidak perlu diketik manual.</p>
 
     <label for="paymentNote">Keterangan (opsional)</label>
     <input id="paymentNote" maxlength="200"
@@ -366,6 +368,15 @@ let selectedLoan = null;
 
 const $ = id => document.getElementById(id);
 const rupiah = n => "Rp " + Number(n || 0).toLocaleString("id-ID");
+
+// Gunakan setoran_harian dari database; jika kosong, gunakan Rp10.000.
+function getBillAmount(loan) {
+  const amount = Number(loan?.setoran_harian);
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 10000;
+}
+function updatePaymentAmount(loan) {
+  $("paymentAmount").value = loan ? String(getBillAmount(loan)) : "";
+}
 
 function message(id, text) {
   $(id).textContent = text;
@@ -537,7 +548,20 @@ function renderCustomer() {
 
   $("paidTotal").textContent = "Perlu verifikasi";
   $("remaining").textContent = "Perlu verifikasi";
-  selectedLoan = null;
+
+  // Setelah QR dipindai, pilih otomatis pinjaman aktif agar nominal langsung muncul.
+  const firstLoan = currentLoans.find(loan =>
+    String(loan.status || "").toLowerCase() === "aktif"
+  ) || currentLoans[0] || null;
+
+  if (firstLoan) {
+    select.value = firstLoan.kode;
+    selectedLoan = firstLoan;
+    updatePaymentAmount(firstLoan);
+  } else {
+    selectedLoan = null;
+    updatePaymentAmount(null);
+  }
 }
 
 $("searchCustomer").addEventListener("click", async () => {
@@ -547,6 +571,7 @@ $("searchCustomer").addEventListener("click", async () => {
 $("loanSelect").addEventListener("change", () => {
   const code = $("loanSelect").value;
   selectedLoan = currentLoans.find(x => x.kode === code) || null;
+  updatePaymentAmount(selectedLoan);
 });
 
 /* SCAN QR */
@@ -678,7 +703,7 @@ $("savePayment").addEventListener("click", async () => {
     $("rNote").textContent = row.ket || "-";
     show("receiptSection");
     message("paymentMessage", "Pembayaran berhasil disimpan ke Supabase. Nomor transaksi: " + row.kode);
-    $("paymentAmount").value = "";
+    updatePaymentAmount(selectedLoan);
     $("paymentNote").value = "";
 
     // Perbarui ringkasan total pembayaran bila izin SELECT tabel pembayaran tersedia.
