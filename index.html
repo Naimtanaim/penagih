@@ -309,9 +309,26 @@ footer {
     <input id="paymentNote" maxlength="200"
            placeholder="Contoh: Setoran harian">
 
+    <label for="paymentMethod">Metode pembayaran</label>
+    <select id="paymentMethod" style="width:100%;padding:13px;border:1px solid #e4eae6;border-radius:11px">
+      <option value="Tunai">Tunai</option>
+      <option value="QRIS">QRIS</option>
+    </select>
+
+    <div id="qrisPanel" class="card hidden" style="margin-top:14px;text-align:center;background:#fbfcfb">
+      <h3>📲 Pembayaran QRIS</h3>
+      <p class="muted">Scan kode QRIS resmi milik usaha Anda menggunakan aplikasi pembayaran. Pastikan nama penerima benar.</p>
+      <img id="qrisImage" alt="Gambar QRIS pembayaran" style="display:none;max-width:100%;width:280px;height:auto;margin:10px auto;border:1px solid #e4eae6;border-radius:10px">
+      <p id="qrisStatus" class="muted">QRIS belum diatur. Admin perlu memasukkan gambar QRIS resmi.</p>
+      <label for="qrisUpload" class="muted no-print">Unggah gambar QRIS resmi (PNG/JPG)</label>
+      <input id="qrisUpload" class="no-print" type="file" accept="image/png,image/jpeg">
+      <button id="clearQris" type="button" class="btn btn-light no-print">Hapus gambar QRIS dari tampilan</button>
+      <p class="muted">Catatan: gambar QR ini hanya menampilkan QRIS yang Anda unggah. Aplikasi ini tidak memverifikasi pembayaran otomatis.</p>
+    </div>
+
     <div class="notice">
       Periksa nama nasabah, kode pinjaman, dan jumlah uang sebelum konfirmasi.
-      Jangan simpan transaksi jika uang belum diterima.
+      Untuk QRIS, konfirmasikan pembayaran hanya setelah transaksi berhasil terlihat di aplikasi penyedia QRIS.
     </div>
 
     <button id="savePayment" type="button" class="btn btn-primary">
@@ -332,6 +349,7 @@ footer {
       <div class="row"><span>Nasabah</span><strong id="rName">-</strong></div>
       <div class="row"><span>Kode pinjaman</span><strong id="rLoan">-</strong></div>
       <div class="row"><span>Jumlah diterima</span><strong id="rAmount">Rp 0</strong></div>
+      <div class="row"><span>Metode pembayaran</span><strong id="rMethod">Tunai</strong></div>
       <div class="row"><span>Keterangan</span><strong id="rNote">-</strong></div>
       <p class="muted" style="text-align:center;margin-top:20px">
         Terima kasih. Simpan bukti pembayaran ini.
@@ -645,6 +663,35 @@ async function stopScanner() {
 
 $("stopScan").addEventListener("click", stopScanner);
 
+/* Tampilan QRIS: unggah gambar QRIS resmi dari penyedia pembayaran. */
+let qrisObjectUrl = null;
+$("paymentMethod").addEventListener("change", () => {
+  if ($("paymentMethod").value === "QRIS") show("qrisPanel");
+  else hide("qrisPanel");
+});
+$("qrisUpload").addEventListener("change", event => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!/^image\/(png|jpeg)$/.test(file.type)) {
+    message("qrisStatus", "Pilih gambar PNG atau JPG.");
+    event.target.value = "";
+    return;
+  }
+  if (qrisObjectUrl) URL.revokeObjectURL(qrisObjectUrl);
+  qrisObjectUrl = URL.createObjectURL(file);
+  $("qrisImage").src = qrisObjectUrl;
+  $("qrisImage").style.display = "block";
+  message("qrisStatus", "Gambar QRIS tampil untuk sesi browser ini. Unggah kembali bila halaman dimuat ulang.");
+});
+$("clearQris").addEventListener("click", () => {
+  if (qrisObjectUrl) URL.revokeObjectURL(qrisObjectUrl);
+  qrisObjectUrl = null;
+  $("qrisImage").removeAttribute("src");
+  $("qrisImage").style.display = "none";
+  $("qrisUpload").value = "";
+  message("qrisStatus", "QRIS belum diatur. Admin perlu memasukkan gambar QRIS resmi.");
+});
+
 /* Simpan satu pembayaran baru ke tabel pembayaran.
    Struktur kolom mengikuti aplikasi utama Toko Zizan:
    kode, pinjaman_id, pinjaman_kode, nasabah_id, nasabah_kode, tgl, nominal, ket.
@@ -680,6 +727,8 @@ $("savePayment").addEventListener("click", async () => {
     const now = new Date();
     const paymentCode = "BYR-" + now.getTime().toString() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
     const note = $("paymentNote").value.trim();
+    const paymentMethod = $("paymentMethod").value;
+    const storedNote = [paymentMethod === "QRIS" ? "Metode: QRIS" : "Metode: Tunai", note].filter(Boolean).join(" | ");
     const row = {
       kode: paymentCode,
       pinjaman_id: selectedLoan.id,
@@ -688,7 +737,7 @@ $("savePayment").addEventListener("click", async () => {
       nasabah_kode: currentCustomer.kode,
       tgl: now.toISOString(),
       nominal: amount,
-      ket: note || null
+      ket: storedNote || null
     };
     const { error } = await db.from("pembayaran").insert(row);
     if (error) throw error;
@@ -700,7 +749,8 @@ $("savePayment").addEventListener("click", async () => {
     $("rName").textContent = currentCustomer.nama || "-";
     $("rLoan").textContent = row.pinjaman_kode;
     $("rAmount").textContent = rupiah(row.nominal);
-    $("rNote").textContent = row.ket || "-";
+    $("rMethod").textContent = paymentMethod;
+    $("rNote").textContent = note || "-";
     show("receiptSection");
     message("paymentMessage", "Pembayaran berhasil disimpan ke Supabase. Nomor transaksi: " + row.kode);
     updatePaymentAmount(selectedLoan);
